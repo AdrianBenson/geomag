@@ -10,3 +10,7 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+cmd/gsm/gsm
+cmd/benmore/benmore
+cmd/fluxgate/fluxgate

@@ -1,0 +1,20 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "PlEm3TaEwm4qK4IVVe4dzHfCxUI=",
+			"path": "github.com/GeoNet/kit/cvendor/libmseed",
+			"revision": "6135ddd28e96b5304c80fb9dccd1721e9556b56e",
+			"revisionTime": "2018-03-04T10:13:31Z",
+			"tree": true
+		},
+		{
+			"checksumSHA1": "hsn1FrZs+QyQCtqaQfvHAPJt3JE=",
+			"path": "github.com/GeoNet/kit/mseed",
+			"revision": "6135ddd28e96b5304c80fb9dccd1721e9556b56e",
+			"revisionTime": "2018-03-04T10:13:31Z"
+		}
+	],
+	"rootPath": "github.com/GeoNet/devx/geomag"
+}
