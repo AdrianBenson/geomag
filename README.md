@@ -1,0 +1,2 @@
+# geomag
+geomagnetic collection programs
