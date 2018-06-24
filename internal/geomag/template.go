@@ -25,7 +25,9 @@ e1={{printf "%.3f" (index .E 1)}}
 epoch={{.Timestamp.Unix}}
 ycoil={{index .Coil y}}
 ybias={{printf "0x%02x" (index .Bias y)}}
+{{if ne 0.0 (index .Offset z) -}}
 zoffset={{index .Offset z}}
+{{end -}}
 yres={{index .Res y}}
 zres={{index .Res z}}
 xres={{index .Res x}}
