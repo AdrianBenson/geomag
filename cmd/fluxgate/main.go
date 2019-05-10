@@ -6,11 +6,9 @@ import (
 	"log"
 	"math"
 	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/ozym/geomag/internal/fdsn"
-	"github.com/ozym/geomag/internal/geomag"
+	"github.com/ozym/geomag/internal/ds"
 )
 
 const timeFormat = "2006-01-02T15:04:05"
@@ -30,7 +28,7 @@ func ticks(d, o time.Duration) time.Duration {
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Build geomag fluxgate processing files\n")
+		fmt.Fprintf(os.Stderr, "Build geomag fluxgate processing files via fdsn\n")
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "\n")
@@ -41,26 +39,32 @@ func main() {
 		flag.PrintDefaults()
 	}
 
-	var network string
-	flag.StringVar(&network, "network", "NZ", "stream network code")
+	var fx string
+	flag.StringVar(&fx, "fx", "", "fluxgate x channel stream srcname")
 
-	var station string
-	flag.StringVar(&station, "station", "", "stream station code")
+	var fy string
+	flag.StringVar(&fy, "fy", "", "fluxgate y channel stream srcname")
 
-	var location string
-	flag.StringVar(&location, "location", "50", "stream location code")
+	var fz string
+	flag.StringVar(&fz, "fz", "", "fluxgate z channel stream srcname")
 
-	var benmore string
-	flag.StringVar(&benmore, "benmore", "", "benmore stream station code")
+	var kd string
+	flag.StringVar(&kd, "kd", "", "driver channel stream srcname")
+
+	var ks string
+	flag.StringVar(&ks, "ks", "", "sensor channel stream srcname")
 
 	var service string
-	flag.StringVar(&service, "service", "https://beta-service-nrt.geonet.org.nz", "fdsn service to use")
+	flag.StringVar(&service, "service", "https://service-nrt.geonet.org.nz", "fdsn service to use")
 
 	var timeout time.Duration
 	flag.DurationVar(&timeout, "timeout", time.Minute, "timeout for FDSN connections")
 
 	var endtime string
-	flag.StringVar(&endtime, "endtime", "", "time to process to")
+	flag.StringVar(&endtime, "endtime", "", "optional time to process to, implies empty interval")
+
+	var starttime string
+	flag.StringVar(&endtime, "starttime", "", "optional time to process from, implies empty interval")
 
 	var length time.Duration
 	flag.DurationVar(&length, "length", time.Hour, "length of time to process")
@@ -69,7 +73,7 @@ func main() {
 	flag.DurationVar(&offset, "offset", 0, "offset from length")
 
 	var interval time.Duration
-	flag.DurationVar(&interval, "interval", 0, "interval to process")
+	flag.DurationVar(&interval, "interval", 0, "interval to process continuously")
 
 	var delay time.Duration
 	flag.DurationVar(&delay, "delay", 0, "delay to remove from processing endtime ")
@@ -147,85 +151,95 @@ func main() {
 	flag.Float64Var(&zpolarity, "zpolarity", -1, "sensor x zpolarity")
 
 	var model string
-	flag.StringVar(&model, "model", "", "loger model")
+	flag.StringVar(&model, "model", "", "logger model")
 
 	var code string
 	flag.StringVar(&code, "code", "", "ite code")
 
+	var path string
+	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{tolower .Label}}.raw", "file name template")
+
+	var truncate time.Duration
+	flag.DurationVar(&truncate, "truncate", time.Hour, "time interval to split files into")
+
 	flag.Parse()
 
-	client := fdsn.NewClient(timeout)
+	var err error
+	var st, et time.Time
+	if starttime != "" {
+		if st, err = time.Parse(timeFormat, starttime); err != nil {
+			log.Fatalf("invalid starttime %s: %v", starttime, err)
+		}
+	}
+	if endtime != "" {
+		if et, err = time.Parse(timeFormat, endtime); err != nil {
+			log.Fatalf("invalid endtime %s: %v", endtime, err)
+		}
+	}
+
+	flux := Fluxgate{
+		Label:    label,
+		Code:     code,
+		Sensor:   sensor,
+		Driver:   driver,
+		Bias:     [3]int{xbias, ybias, zbias},
+		Coil:     [3]float64{xcoil, ycoil, zcoil},
+		Res:      [3]float64{xres, yres, zres},
+		E:        [5]float64{e0, e1, e2, e3, e4},
+		Step:     step,
+		Offset:   [3]float64{0, 0, zoffset},
+		Polarity: [3]float64{1, 1, zpolarity},
+		Model:    model,
+		Gain:     gain,
+	}
+
+	client := ds.NewDataselect(service, timeout)
 
 	for {
-		tock := func() time.Time {
-			if endtime != "" {
-				t, err := time.Parse(timeFormat, endtime)
-				if err != nil {
-					log.Fatalf("invalid end time %s: %v", endtime, err)
-				}
-				return t
+		t, dt := func() (time.Time, time.Duration) {
+			switch {
+			case !st.IsZero() && !et.IsZero():
+				return et, et.Sub(st)
+			case !st.IsZero():
+				return st.Add(length), length
+			case !et.IsZero():
+				return et, length
+			default:
+				t := <-time.After(ticks(interval, offset))
+				return t.UTC().Add(-delay), length
 			}
-
-			<-time.After(ticks(interval, offset))
-
-			return time.Now().UTC().Add(-delay)
 		}()
 
-		obs := make(map[time.Time][]int32)
-		for _, c := range []string{"LFX", "LFY", "LFZ", "LKD", "LKS"} {
-			r, err := (fdsn.Source{
-				Network:  network,
-				Station:  station,
-				Location: location,
-				Channel:  c,
-			}).Request(service, tock, length)
-			if err != nil {
-				log.Fatalf("invalid service %s: %v", service, err)
-			}
-			if err := client.Sample(r, func(s string, t time.Time, v int32) error {
-				obs[t] = append(obs[t], v)
-				return nil
-			}); err != nil {
-				log.Fatalf("invalid query %s: %v", r, err)
-			}
+		obs, err := client.Query([]string{fx, fy, fz, kd, ks}, t, dt)
+		if err != nil {
+			log.Fatalf("unable to query fdsn service: %v", err)
 		}
-
-		var full []geomag.Full
+		var full []Full
 		for t, v := range obs {
-			if len(v) != 5 {
+			var f []float64
+			for _, i := range v {
+				f = append(f, float64(i)/volts)
+			}
+			if len(f) < 5 {
 				continue
 			}
-			full = append(full, geomag.Full{
+			full = append(full, Full{
 				Timestamp: t.Truncate(time.Second),
-				Field:     [3]float64{float64(v[0]) / volts, float64(v[1]) / volts, float64(v[2]) / volts},
+				Field:     [3]float64{f[0], f[1], f[2]},
 				//TODO: bug?
-				Driver: scale*float64(v[4])/volts - 273,
-				Sensor: scale*float64(v[3])/volts - 273,
+				Driver: scale*f[4] - 273,
+				Sensor: scale*f[3] - 273,
 			})
 		}
 
-		for _, f := range geomag.NewFluxgate(full) {
-			f.Label = code
-			f.Sensor = sensor
-			f.Driver = driver
-			f.Bias = [3]int{xbias, ybias, zbias}
-			f.Coil = [3]float64{xcoil, ycoil, zcoil}
-			f.Res = [3]float64{xres, yres, zres}
-			f.E = [5]float64{e0, e1, e2, e3, e4}
-			f.Step = step
-			f.Offset = [3]float64{0, 0, zoffset}
-			f.Polarity = [3]float64{1, 1, zpolarity}
-			f.Model = model
-			f.Gain = gain // not used other than for template
-
-			path := filepath.Join(base, f.Filename(label))
-			if err := f.WriteFile(path); err != nil {
-				log.Fatalf("unable to store file %s: %v", path, err)
+		for _, f := range flux.Split(full, truncate) {
+			filename, err := f.Filename(base, path)
+			if err != nil {
+				log.Fatalf("unable to build file name %s: %v", path, err)
 			}
-		}
-
-		if endtime != "" {
-			break
+			if err := f.WriteFile(string(filename)); err != nil {
+				log.Fatalf("unable to store file %s: %v", string(filename), err)
+			}
 		}
 
 		if !(interval > 0) {
