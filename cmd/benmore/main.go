@@ -6,12 +6,9 @@ import (
 	"log"
 	"math"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/ozym/geomag/internal/fdsn"
-	"github.com/ozym/geomag/internal/geomag"
+	"github.com/ozym/geomag/internal/ds"
 )
 
 const timeFormat = "2006-01-02T15:04:05"
@@ -31,7 +28,7 @@ func ticks(d, o time.Duration) time.Duration {
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Build geomag benmore processing files\n")
+		fmt.Fprintf(os.Stderr, "Build geomag benmore processing files via fdsn\n")
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "\n")
@@ -42,23 +39,20 @@ func main() {
 		flag.PrintDefaults()
 	}
 
-	var network string
-	flag.StringVar(&network, "network", "NZ", "stream network code")
-
-	var station string
-	flag.StringVar(&station, "station", "SMHS", "stream station code")
-
-	var location string
-	flag.StringVar(&location, "location", "50", "stream location code")
+	var fz string
+	flag.StringVar(&fz, "fz", "", "benmore z channel stream srcname")
 
 	var service string
-	flag.StringVar(&service, "service", "https://beta-service-nrt.geonet.org.nz", "fdsn service to use")
+	flag.StringVar(&service, "service", "https://service-nrt.geonet.org.nz", "fdsn service to use")
 
 	var timeout time.Duration
 	flag.DurationVar(&timeout, "timeout", time.Minute, "timeout for FDSN connections")
 
 	var endtime string
-	flag.StringVar(&endtime, "endtime", "", "time to process to")
+	flag.StringVar(&endtime, "endtime", "", "optional time to process to, implies empty interval")
+
+	var starttime string
+	flag.StringVar(&endtime, "starttime", "", "optional time to process from, implies empty interval")
 
 	var length time.Duration
 	flag.DurationVar(&length, "length", time.Hour, "length of time to process")
@@ -67,74 +61,162 @@ func main() {
 	flag.DurationVar(&offset, "offset", 0, "offset from length")
 
 	var interval time.Duration
-	flag.DurationVar(&interval, "interval", 0, "interval to process")
+	flag.DurationVar(&interval, "interval", 0, "interval to process continuously")
 
 	var delay time.Duration
-	flag.DurationVar(&delay, "delay", 0, "add delay to end time")
+	flag.DurationVar(&delay, "delay", 0, "delay to remove from processing endtime ")
 
 	var base string
 	flag.StringVar(&base, "base", ".", "base directory")
 
 	var label string
-	flag.StringVar(&label, "label", "fge-benmore", "label to use")
+	flag.StringVar(&label, "label", "unknown", "label to use")
 
 	var volts float64
 	flag.Float64Var(&volts, "volts", math.Pow(2.0, 24)/40, "sample scale factor")
 
+	/**
+	var gain float64
+	flag.Float64Var(&gain, "gain", 1280, "sample scale factor")
+
+	var scale float64
+	flag.Float64Var(&scale, "scale", 200, "conversion unit for temperature")
+
+	var step float64
+	flag.Float64Var(&step, "step", 0.003922, "gain step")
+
+	var sensor int
+	flag.IntVar(&sensor, "sensor", 0, "sensor id")
+
+	var driver int
+	flag.IntVar(&driver, "driver", 0, "driver id")
+
+	var xbias int
+	flag.IntVar(&xbias, "xbias", 0, "sensor x bias")
+
+	var ybias int
+	flag.IntVar(&ybias, "ybias", 0, "sensor x bias")
+
+	var zbias int
+	flag.IntVar(&zbias, "zbias", 0, "sensor x bias")
+
+	var xcoil float64
+	flag.Float64Var(&xcoil, "xcoil", 0, "sensor x coil")
+
+	var ycoil float64
+	flag.Float64Var(&ycoil, "ycoil", 0, "sensor x coil")
+
+	var zcoil float64
+	flag.Float64Var(&zcoil, "zcoil", 0, "sensor x coil")
+
+	var xres float64
+	flag.Float64Var(&xres, "xres", 0, "sensor x res")
+
+	var yres float64
+	flag.Float64Var(&yres, "yres", 0, "sensor x res")
+
+	var zres float64
+	flag.Float64Var(&zres, "zres", 0, "sensor x res")
+
+	var e0 float64
+	flag.Float64Var(&e0, "e0", 0, "sensor x e0")
+
+	var e1 float64
+	flag.Float64Var(&e1, "e1", 0, "sensor x e1")
+
+	var e2 float64
+	flag.Float64Var(&e2, "e2", 0, "sensor x e2")
+
+	var e3 float64
+	flag.Float64Var(&e3, "e3", 0, "sensor x e3")
+
+	var e4 float64
+	flag.Float64Var(&e4, "e4", 0, "sensor x e4")
+
+	var zoffset float64
+	flag.Float64Var(&zoffset, "zoffset", 0, "sensor x zoffset")
+
+	var zpolarity float64
+	flag.Float64Var(&zpolarity, "zpolarity", -1, "sensor x zpolarity")
+
+	var model string
+	flag.StringVar(&model, "model", "", "logger model")
+
+	var code string
+	flag.StringVar(&code, "code", "", "ite code")
+	**/
+
+	var path string
+	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{tolower .Label}}.raw", "file name template")
+
+	var truncate time.Duration
+	flag.DurationVar(&truncate, "truncate", time.Hour, "time interval to split files into")
+
 	flag.Parse()
 
-	if volts == 0 {
-		log.Fatalf("volts argument cannot be zero")
+	var err error
+	var st, et time.Time
+	if starttime != "" {
+		if st, err = time.Parse(timeFormat, starttime); err != nil {
+			log.Fatalf("invalid starttime %s: %v", starttime, err)
+		}
+	}
+	if endtime != "" {
+		if et, err = time.Parse(timeFormat, endtime); err != nil {
+			log.Fatalf("invalid endtime %s: %v", endtime, err)
+		}
 	}
 
-	leader := strings.Join([]string{network, station, location, "LFZ"}, "_")
+	benmore := Benmore{
+		Label:  label,
+		Prefix: fz,
+	}
 
-	client := fdsn.NewClient(timeout)
+	client := ds.NewDataselect(service, timeout)
 
 	for {
-		tock := func() time.Time {
-			if endtime != "" {
-				t, err := time.Parse(timeFormat, endtime)
-				if err != nil {
-					log.Fatalf("invalid end time %s: %v", endtime, err)
-				}
-				return t
+		t, dt := func() (time.Time, time.Duration) {
+			switch {
+			case !st.IsZero() && !et.IsZero():
+				return et, et.Sub(st)
+			case !st.IsZero():
+				return st.Add(length), length
+			case !et.IsZero():
+				return et, length
+			default:
+				t := <-time.After(ticks(interval, offset))
+				return t.UTC().Add(-delay), length
 			}
-
-			<-time.After(ticks(interval, offset))
-
-			return time.Now().UTC().Add(-delay)
 		}()
 
-		var values []geomag.Value
-		r, err := (fdsn.Source{
-			Network:  network,
-			Station:  station,
-			Location: location,
-			Channel:  "LFZ",
-		}).Request(service, tock, length)
+		obs, err := client.Query([]string{fz}, t, dt)
 		if err != nil {
-			log.Fatalf("invalid service %s: %v", service, err)
-		}
-		if err := client.Sample(r, func(s string, t time.Time, v int32) error {
-			values = append(values, geomag.Value{
-				Timestamp: t,
-				Field:     float64(v) / volts,
-			})
-			return nil
-		}); err != nil {
-			log.Fatalf("invalid query %s: %v", r, err)
+			log.Fatalf("unable to query fdsn service: %v", err)
 		}
 
-		for _, g := range geomag.NewVertical(leader, values) {
-			path := filepath.Join(base, g.Filename(label))
-			if err := g.WriteFile(path); err != nil {
-				log.Fatalf("unable to store file %s: %v", path, err)
+		var full []Value
+		for t, v := range obs {
+			var f []float64
+			for _, i := range v {
+				f = append(f, float64(i)/volts)
 			}
+			if len(f) < 1 {
+				continue
+			}
+			full = append(full, Value{
+				Timestamp: t.Truncate(time.Second),
+				Field:     f[0],
+			})
 		}
 
-		if endtime != "" {
-			break
+		for _, f := range benmore.Split(full, truncate) {
+			filename, err := f.Filename(base, path)
+			if err != nil {
+				log.Fatalf("unable to build file name %s: %v", path, err)
+			}
+			if err := f.WriteFile(string(filename)); err != nil {
+				log.Fatalf("unable to store file %s: %v", string(filename), err)
+			}
 		}
 
 		if !(interval > 0) {
