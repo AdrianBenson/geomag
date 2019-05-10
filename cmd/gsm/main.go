@@ -4,13 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/ozym/geomag/internal/fdsn"
-	"github.com/ozym/geomag/internal/geomag"
+	"github.com/ozym/geomag/internal/ds"
 )
 
 const timeFormat = "2006-01-02T15:04:05"
@@ -30,7 +28,7 @@ func ticks(d, o time.Duration) time.Duration {
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Build geomag gsm processing files\n")
+		fmt.Fprintf(os.Stderr, "Build geomag benmore processing files via fdsn\n")
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "\n")
@@ -41,23 +39,23 @@ func main() {
 		flag.PrintDefaults()
 	}
 
-	var network string
-	flag.StringVar(&network, "network", "NZ", "stream network code")
+	var ff string
+	flag.StringVar(&ff, "ff", "", "gsm absolute channel stream srcname")
 
-	var station string
-	flag.StringVar(&station, "station", "", "stream station code")
-
-	var location string
-	flag.StringVar(&location, "location", "51", "stream location code")
+	var eq string
+	flag.StringVar(&eq, "eq", "", "gsm quality channel stream srcname")
 
 	var service string
-	flag.StringVar(&service, "service", "https://beta-service-nrt.geonet.org.nz", "fdsn service to use")
+	flag.StringVar(&service, "service", "https://service-nrt.geonet.org.nz", "fdsn service to use")
 
 	var timeout time.Duration
 	flag.DurationVar(&timeout, "timeout", time.Minute, "timeout for FDSN connections")
 
 	var endtime string
-	flag.StringVar(&endtime, "endtime", "", "time to process to")
+	flag.StringVar(&endtime, "endtime", "", "optional time to process to, implies empty interval")
+
+	var starttime string
+	flag.StringVar(&endtime, "starttime", "", "optional time to process from, implies empty interval")
 
 	var length time.Duration
 	flag.DurationVar(&length, "length", time.Hour, "length of time to process")
@@ -66,7 +64,7 @@ func main() {
 	flag.DurationVar(&offset, "offset", 0, "offset from length")
 
 	var interval time.Duration
-	flag.DurationVar(&interval, "interval", 0, "interval to process")
+	flag.DurationVar(&interval, "interval", 0, "interval to process continuously")
 
 	var delay time.Duration
 	flag.DurationVar(&delay, "delay", 0, "delay to remove from processing endtime ")
@@ -77,68 +75,81 @@ func main() {
 	var label string
 	flag.StringVar(&label, "label", "unknown", "label to use")
 
+	var volts float64
+	flag.Float64Var(&volts, "volts", math.Pow(2.0, 24)/40, "sample scale factor")
+
+	var scale float64
+	flag.Float64Var(&scale, "scale", 1, "conversion unit for field intensity")
+
+	var path string
+	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{tolower .Label}}.raw", "file name template")
+
+	var truncate time.Duration
+	flag.DurationVar(&truncate, "truncate", time.Hour, "time interval to split files into")
+
 	flag.Parse()
 
-	client := fdsn.NewClient(timeout)
+	var err error
+	var st, et time.Time
+	if starttime != "" {
+		if st, err = time.Parse(timeFormat, starttime); err != nil {
+			log.Fatalf("invalid starttime %s: %v", starttime, err)
+		}
+	}
+	if endtime != "" {
+		if et, err = time.Parse(timeFormat, endtime); err != nil {
+			log.Fatalf("invalid endtime %s: %v", endtime, err)
+		}
+	}
 
-	leader := strings.Join([]string{network, station, location, "LFF"}, "_")
+	gsm := Gsm{
+		Label:  label,
+		Prefix: ff,
+	}
+
+	client := ds.NewDataselect(service, timeout)
 
 	for {
-		tock := func() time.Time {
-			if endtime != "" {
-				t, err := time.Parse(timeFormat, endtime)
-				if err != nil {
-					log.Fatalf("invalid end time %s: %v", endtime, err)
-				}
-				return t
+		t, dt := func() (time.Time, time.Duration) {
+			switch {
+			case !st.IsZero() && !et.IsZero():
+				return et, et.Sub(st)
+			case !st.IsZero():
+				return st.Add(length), length
+			case !et.IsZero():
+				return et, length
+			default:
+				t := <-time.After(ticks(interval, offset))
+				return t.UTC().Add(-delay), length
 			}
-
-			<-time.After(ticks(interval, offset))
-
-			return time.Now().UTC().Add(-delay)
 		}()
 
-		obs := make(map[time.Time][]int32)
-		for _, c := range []string{"LFF", "LEQ"} {
-			r, err := (fdsn.Source{
-				Network:  network,
-				Station:  station,
-				Location: location,
-				Channel:  c,
-			}).Request(service, tock, length)
-			if err != nil {
-				log.Fatalf("invalid service %s: %v", service, err)
-			}
-			if err := client.Sample(r, func(s string, t time.Time, v int32) error {
-				obs[t] = append(obs[t], v)
-				return nil
-			}); err != nil {
-				log.Fatalf("invalid query %s: %v", r, err)
-			}
+		obs, err := client.Query([]string{ff, eq}, t, dt)
+		if err != nil {
+			log.Fatalf("unable to query fdsn service: %v", err)
 		}
 
-		var abs []geomag.Absolute
+		var full []Absolute
 		for t, v := range obs {
-			if len(v) != 2 {
+			if len(v) < 2 {
 				continue
 			}
 
-			abs = append(abs, geomag.Absolute{
-				Timestamp: t,
-				Field:     float64(v[0]),
+			full = append(full, Absolute{
+				Timestamp: t.Truncate(time.Second),
+				Field:     float64(v[0]) / scale,
 				Quality:   float64(v[1]),
 			})
 		}
 
-		for _, g := range geomag.NewGsm(leader, abs) {
-			path := filepath.Join(base, g.Filename(label))
-			if err := g.WriteFile(path); err != nil {
-				log.Fatalf("unable to store file %s: %v", path, err)
+		for _, f := range gsm.Split(full, truncate) {
+			filename, err := f.Filename(base, path)
+			if err != nil {
+				log.Fatalf("unable to build file name %s: %v", path, err)
 			}
-		}
-
-		if endtime != "" {
-			break
+			if err := f.WriteFile(string(filename)); err != nil {
+				log.Fatalf("unable to store file %s: %v", string(filename), err)
+			}
 		}
 
 		if !(interval > 0) {
