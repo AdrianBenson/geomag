@@ -1,36 +1,78 @@
 package gm
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 )
 
-type Decoder interface {
-	Decode([]byte) error
+/**
+type Reading struct {
+	Timestamp time.Time
+	Label     string
+	Field     float64
 }
 
-type Encoder interface {
+func NewReading(t time.Time, l string, v float64) Reading {
+	return Reading{
+		Timestamp: t,
+		Label:     l,
+		Field:     v,
+	}
+}
+**/
+
+type Valuer interface {
+	At() time.Time
+	Tag() string
+	Values() []float64
+}
+
+type Formatter interface {
+	At() time.Time
+	Tag() string
 	Encode() ([]byte, error)
-	Merge([]byte) error
+	Decode(data []byte) error
+	Merge(data []byte) error
+	Split(time.Duration) []Formatter
 }
 
-// ReadFile will read and decode a fluxgate file.
-func ReadFile(path string, dc Decoder) error {
+func Store(base, path string, truncate time.Duration, format Formatter) error {
+	for _, f := range format.Split(truncate) {
+		filename, err := Filename(base, path, f)
+		if err != nil {
+			return err
+		}
+		if err := WriteFile(string(filename), f); err != nil {
+			return err
+		}
+	}
 
-	data, err := readFile(path)
+	return nil
+}
+
+func ReadFile(path string, format Formatter) error {
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return err
 	}
 
-	if err := dc.Decode(data); err != nil {
+	if err := format.Decode(data); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// WriteFile will encode and write a fluxgate file, existing values will be merged.
-func WriteFile(path string, en Encoder) error {
+func WriteFile(path string, format Formatter) error {
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
@@ -41,13 +83,12 @@ func WriteFile(path string, en Encoder) error {
 		if err != nil {
 			return err
 		}
-
-		if err := en.Merge(data); err != nil {
+		if err := format.Merge(data); err != nil {
 			return err
 		}
 	}
 
-	data, err := en.Encode()
+	data, err := format.Encode()
 	if err != nil {
 		return err
 	}
