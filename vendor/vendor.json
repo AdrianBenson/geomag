@@ -10,11 +10,24 @@
 			"tree": true
 		},
 		{
+			"checksumSHA1": "COoBtM2pBT/sIviXl9DLlLeOnwg=",
+			"path": "github.com/GeoNet/kit/cvendor/libslink",
+			"revision": "1d6c353e4761f0c3ddb422e971f396a2117e4d5f",
+			"revisionTime": "2019-05-23T00:05:41Z",
+			"tree": true
+		},
+		{
 			"checksumSHA1": "hsn1FrZs+QyQCtqaQfvHAPJt3JE=",
 			"path": "github.com/GeoNet/kit/mseed",
 			"revision": "6135ddd28e96b5304c80fb9dccd1721e9556b56e",
 			"revisionTime": "2018-03-04T10:13:31Z"
+		},
+		{
+			"checksumSHA1": "t38j2UzrrZjF5gqo6pw8aIkukYQ=",
+			"path": "github.com/GeoNet/kit/slink",
+			"revision": "1d6c353e4761f0c3ddb422e971f396a2117e4d5f",
+			"revisionTime": "2019-05-23T00:05:41Z"
 		}
 	],
-	"rootPath": "github.com/GeoNet/devx/geomag"
+	"rootPath": "github.com/ozym/geomag"
 }
