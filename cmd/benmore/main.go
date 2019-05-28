@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ozym/geomag/internal/ds"
+	"github.com/ozym/geomag/internal/gm"
 )
 
 const timeFormat = "2006-01-02T15:04:05"
@@ -75,77 +76,6 @@ func main() {
 	var volts float64
 	flag.Float64Var(&volts, "volts", math.Pow(2.0, 24)/40, "sample scale factor")
 
-	/**
-	var gain float64
-	flag.Float64Var(&gain, "gain", 1280, "sample scale factor")
-
-	var scale float64
-	flag.Float64Var(&scale, "scale", 200, "conversion unit for temperature")
-
-	var step float64
-	flag.Float64Var(&step, "step", 0.003922, "gain step")
-
-	var sensor int
-	flag.IntVar(&sensor, "sensor", 0, "sensor id")
-
-	var driver int
-	flag.IntVar(&driver, "driver", 0, "driver id")
-
-	var xbias int
-	flag.IntVar(&xbias, "xbias", 0, "sensor x bias")
-
-	var ybias int
-	flag.IntVar(&ybias, "ybias", 0, "sensor x bias")
-
-	var zbias int
-	flag.IntVar(&zbias, "zbias", 0, "sensor x bias")
-
-	var xcoil float64
-	flag.Float64Var(&xcoil, "xcoil", 0, "sensor x coil")
-
-	var ycoil float64
-	flag.Float64Var(&ycoil, "ycoil", 0, "sensor x coil")
-
-	var zcoil float64
-	flag.Float64Var(&zcoil, "zcoil", 0, "sensor x coil")
-
-	var xres float64
-	flag.Float64Var(&xres, "xres", 0, "sensor x res")
-
-	var yres float64
-	flag.Float64Var(&yres, "yres", 0, "sensor x res")
-
-	var zres float64
-	flag.Float64Var(&zres, "zres", 0, "sensor x res")
-
-	var e0 float64
-	flag.Float64Var(&e0, "e0", 0, "sensor x e0")
-
-	var e1 float64
-	flag.Float64Var(&e1, "e1", 0, "sensor x e1")
-
-	var e2 float64
-	flag.Float64Var(&e2, "e2", 0, "sensor x e2")
-
-	var e3 float64
-	flag.Float64Var(&e3, "e3", 0, "sensor x e3")
-
-	var e4 float64
-	flag.Float64Var(&e4, "e4", 0, "sensor x e4")
-
-	var zoffset float64
-	flag.Float64Var(&zoffset, "zoffset", 0, "sensor x zoffset")
-
-	var zpolarity float64
-	flag.Float64Var(&zpolarity, "zpolarity", -1, "sensor x zpolarity")
-
-	var model string
-	flag.StringVar(&model, "model", "", "logger model")
-
-	var code string
-	flag.StringVar(&code, "code", "", "ite code")
-	**/
-
 	var path string
 	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{tolower .Label}}.raw", "file name template")
 
@@ -165,11 +95,6 @@ func main() {
 		if et, err = time.Parse(timeFormat, endtime); err != nil {
 			log.Fatalf("invalid endtime %s: %v", endtime, err)
 		}
-	}
-
-	benmore := Benmore{
-		Label:  label,
-		Prefix: fz,
 	}
 
 	client := ds.NewDataselect(service, timeout)
@@ -194,28 +119,26 @@ func main() {
 			log.Fatalf("unable to query fdsn service: %v", err)
 		}
 
-		var full []Value
-		for t, v := range obs {
-			var f []float64
-			for _, i := range v {
-				f = append(f, float64(i)/volts)
+		raw := make(map[string]*gm.Benmore)
+		for t, x := range obs {
+			for i, v := range x {
+				if !(i < 1) {
+					continue
+				}
+
+				if _, ok := raw[fz]; !ok {
+					raw[fz] = gm.NewBenmore(label)
+				}
+
+				if r, ok := raw[fz]; ok {
+					r.Add(gm.NewReading(t, fz, float64(v)/volts))
+				}
 			}
-			if len(f) < 1 {
-				continue
-			}
-			full = append(full, Value{
-				Timestamp: t.Truncate(time.Second),
-				Field:     f[0],
-			})
 		}
 
-		for _, f := range benmore.Split(full, truncate) {
-			filename, err := f.Filename(base, path)
-			if err != nil {
-				log.Fatalf("unable to build file name %s: %v", path, err)
-			}
-			if err := f.WriteFile(string(filename)); err != nil {
-				log.Fatalf("unable to store file %s: %v", string(filename), err)
+		for _, v := range raw {
+			if err := v.Store(base, path, truncate); err != nil {
+				log.Fatalf("unable to store observations: %v", err)
 			}
 		}
 
