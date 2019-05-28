@@ -98,16 +98,16 @@ func (b *Benmore) Decode(data []byte) error {
 			if err != nil {
 				return err
 			}
-			f, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
-			if err != nil {
-				return err
+			var values []float64
+			for _, v := range parts[2:] {
+				f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+				if err != nil {
+					return err
+				}
+				values = append(values, f)
 			}
 
-			b.Readings = append(b.Readings, Reading{
-				Timestamp: t,
-				Label:     strings.TrimSpace(parts[0]),
-				Field:     f,
-			})
+			b.Readings = append(b.Readings, NewReading(t, strings.TrimSpace(parts[0]), values))
 		}
 	}
 

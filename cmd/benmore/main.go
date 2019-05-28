@@ -121,18 +121,16 @@ func main() {
 
 		raw := make(map[string]*gm.Benmore)
 		for t, x := range obs {
-			for i, v := range x {
-				if !(i < 1) {
-					continue
-				}
+			if len(x) < 1 {
+				continue
+			}
 
-				if _, ok := raw[fz]; !ok {
-					raw[fz] = gm.NewBenmore(label)
-				}
+			if _, ok := raw[fz]; !ok {
+				raw[fz] = gm.NewBenmore(label)
+			}
 
-				if r, ok := raw[fz]; ok {
-					r.Add(gm.NewReading(t, fz, float64(v)/volts))
-				}
+			if r, ok := raw[fz]; ok {
+				r.Add(gm.NewReading(t, fz, []float64{float64(x[0]) / volts}))
 			}
 		}
 

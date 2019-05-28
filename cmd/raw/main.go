@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ozym/geomag/internal/ds"
@@ -29,7 +29,7 @@ func ticks(d, o time.Duration) time.Duration {
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Build geomag benmore processing files via fdsn\n")
+		fmt.Fprintf(os.Stderr, "Build geomag raw processing files via fdsn\n")
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "\n")
@@ -40,11 +40,8 @@ func main() {
 		flag.PrintDefaults()
 	}
 
-	var ff string
-	flag.StringVar(&ff, "ff", "", "gsm absolute channel stream srcname")
-
-	var eq string
-	flag.StringVar(&eq, "eq", "", "gsm quality channel stream srcname")
+	var streams string
+	flag.StringVar(&streams, "streams", "", "comma delimited channel srcname(s)")
 
 	var service string
 	flag.StringVar(&service, "service", "https://service-nrt.geonet.org.nz", "fdsn service to use")
@@ -73,20 +70,14 @@ func main() {
 	var base string
 	flag.StringVar(&base, "base", ".", "base directory")
 
-	var label string
-	flag.StringVar(&label, "label", "unknown", "label to use")
-
-	var volts float64
-	flag.Float64Var(&volts, "volts", math.Pow(2.0, 24)/40, "sample scale factor")
-
-	var scale float64
-	flag.Float64Var(&scale, "scale", 1, "conversion unit for field intensity")
-
-	var path string
-	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{tolower .Label}}.raw", "file name template")
-
 	var truncate time.Duration
 	flag.DurationVar(&truncate, "truncate", time.Hour, "time interval to split files into")
+
+	var path string
+	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{toupper .Label}}.csv", "file name template")
+
+	var dp int
+	flag.IntVar(&dp, "dp", 0, "number of decimal places for raw data")
 
 	flag.Parse()
 
@@ -103,12 +94,10 @@ func main() {
 		}
 	}
 
-	/**
-	gsm := Gsm{
-		Label:  label,
-		Prefix: ff,
+	var srcnames []string
+	for _, s := range strings.Split(streams, ",") {
+		srcnames = append(srcnames, strings.TrimSpace(s))
 	}
-	**/
 
 	client := ds.NewDataselect(service, timeout)
 
@@ -127,26 +116,26 @@ func main() {
 			}
 		}()
 
-		obs, err := client.Query([]string{ff, eq}, t, dt)
+		obs, err := client.Query(srcnames, t, dt)
 		if err != nil {
 			log.Fatalf("unable to query fdsn service: %v", err)
 		}
 
-		raw := make(map[string]*gm.Gsm)
+		raw := make(map[string]*gm.Raw)
 		for t, x := range obs {
-			if len(x) < 2 {
-				continue
-			}
+			for i, v := range x {
+				if !(i < len(srcnames)) {
+					continue
+				}
+				srcname := srcnames[i]
 
-			f := float64(x[0]) / scale
-			q := float64(x[1])
+				if _, ok := raw[srcname]; !ok {
+					raw[srcname] = gm.NewRaw(srcname, dp)
+				}
 
-			if _, ok := raw[ff]; !ok {
-				raw[ff] = gm.NewGsm(label)
-			}
-
-			if r, ok := raw[ff]; ok {
-				r.Add(gm.NewReading(t, ff, []float64{f, q}))
+				if r, ok := raw[srcname]; ok {
+					r.Add(gm.NewReading(t, srcname, float64(v)))
+				}
 			}
 		}
 
@@ -156,30 +145,9 @@ func main() {
 			}
 		}
 
-		/**
-		var full []Absolute
-		for t, v := range obs {
-			if len(v) < 2 {
-				continue
-			}
-
-			full = append(full, Absolute{
-				Timestamp: t.Truncate(time.Second),
-				Field:     float64(v[0]) / scale,
-				Quality:   float64(v[1]),
-			})
+		if !st.IsZero() || !et.IsZero() {
+			break
 		}
-
-		for _, f := range gsm.Split(full, truncate) {
-			filename, err := f.Filename(base, path)
-			if err != nil {
-				log.Fatalf("unable to build file name %s: %v", path, err)
-			}
-			if err := f.WriteFile(string(filename)); err != nil {
-				log.Fatalf("unable to store file %s: %v", string(filename), err)
-			}
-		}
-		**/
 
 		if !(interval > 0) {
 			break

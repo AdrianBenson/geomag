@@ -14,10 +14,10 @@ const rawFormat = "2006-01-02 15:04:05.000000Z"
 type Reading struct {
 	Timestamp time.Time
 	Label     string
-	Field     float64
+	Field     []float64
 }
 
-func NewReading(t time.Time, l string, v float64) Reading {
+func NewReading(t time.Time, l string, v []float64) Reading {
 	return Reading{
 		Timestamp: t,
 		Label:     l,
@@ -34,7 +34,7 @@ func (r Reading) Tag() string {
 }
 
 func (r Reading) Values() []float64 {
-	return []float64{r.Field}
+	return r.Field
 }
 
 type Raw struct {
@@ -108,11 +108,14 @@ func (r Raw) Encode() ([]byte, error) {
 
 	var lines [][]string
 	for _, v := range r.Readings {
-		lines = append(lines, []string{
+		values := []string{
 			v.Timestamp.Format(rawFormat),
 			v.Label,
-			strconv.FormatFloat(v.Field, 'f', r.Precision, 64),
-		})
+		}
+		for _, f := range v.Field {
+			values = append(values, strconv.FormatFloat(f, 'f', r.Precision, 64))
+		}
+		lines = append(lines, values)
 	}
 
 	var buf bytes.Buffer
@@ -147,12 +150,17 @@ func (r *Raw) Decode(data []byte) error {
 			return err
 		}
 
-		v, err := strconv.ParseFloat(l[2], 64)
-		if err != nil {
-			return err
+		var values []float64
+
+		for _, f := range l[2:] {
+			v, err := strconv.ParseFloat(f, 64)
+			if err != nil {
+				return err
+			}
+			values = append(values, v)
 		}
 
-		r.Readings = append(r.Readings, NewReading(t, l[1], v))
+		r.Readings = append(r.Readings, NewReading(t, l[1], values))
 	}
 
 	return nil
