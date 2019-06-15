@@ -59,14 +59,6 @@ func main() {
 	var state time.Duration
 	flag.DurationVar(&state, "state", 5*time.Minute, "how often to save state")
 
-	/**
-	var offset time.Duration
-	flag.DurationVar(&offset, "offset", 0, "offset from length")
-
-	var publish time.Duration
-	flag.DurationVar(&publish, "publish", time.Minute, "interval to publish")
-	**/
-
 	var truncate time.Duration
 	flag.DurationVar(&truncate, "truncate", time.Hour, "interval to store files")
 
@@ -75,11 +67,6 @@ func main() {
 
 	var path string
 	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{toupper .Label}}.csv", "file name template")
-
-	/**
-	var label string
-	flag.StringVar(&label, "label", "", "provide a file name label")
-	**/
 
 	var dp int
 	flag.IntVar(&dp, "dp", 0, "number of decimal places for raw data")
@@ -102,7 +89,6 @@ func main() {
 		log.Fatalf("unable to create base parent directory %s: %v", base, err)
 	}
 
-	// general miniseed amplitude block handler
 	handler := make(chan []byte, 20000)
 	go func() {
 		msr := mseed.NewMSRecord()
