@@ -2,13 +2,9 @@
 
 geomagnetic collection programs
 
-* __slgeomeg__ SeedLink raw csv collector
-* __msgeomeg__ MiniSeed raw csv collector
-* __raw__ FDSN raw csv collector
-
-* __gsm__ Overhauser collector
-* __benmore__ Vertical field collector
-* __fluxgate__ Full field collector
+* __slgeomag__ SeedLink raw csv collector
+* __msgeomag__ MiniSeed raw csv collector
+* __wsgeomag__ FDSN raw csv collector
 
 ```
 cd vendor/github.com/GeoNet/kit/cvendor/libmseed
