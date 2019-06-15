@@ -11,7 +11,7 @@ import (
 	"github.com/GeoNet/kit/mseed"
 	"github.com/GeoNet/kit/slink"
 
-	"github.com/ozym/geomag/internal/gm"
+	"github.com/ozym/geomag/internal/raw"
 )
 
 const timeFormat = "2006,01,02,15,04,05"
@@ -28,13 +28,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "General Options:\n")
 		fmt.Fprintf(os.Stderr, "\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "Commands:\n")
-		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "  benmore    -- process benmore observations\n")
-		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Use: \"%s <command> --help\" for more information about a specific command\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\n")
 	}
+
+	var verbose bool
+	flag.BoolVar(&verbose, "verbose", false, "make noise")
 
 	// seedlink options
 	var netdly time.Duration
@@ -61,11 +59,13 @@ func main() {
 	var state time.Duration
 	flag.DurationVar(&state, "state", 5*time.Minute, "how often to save state")
 
+	/**
 	var offset time.Duration
 	flag.DurationVar(&offset, "offset", 0, "offset from length")
 
 	var publish time.Duration
 	flag.DurationVar(&publish, "publish", time.Minute, "interval to publish")
+	**/
 
 	var truncate time.Duration
 	flag.DurationVar(&truncate, "truncate", time.Hour, "interval to store files")
@@ -76,11 +76,16 @@ func main() {
 	var path string
 	flag.StringVar(&path, "path", "{{year}}/{{year}}.{{yearday}}/{{year}}.{{yearday}}.{{hour}}{{minute}}.{{second}}.{{toupper .Label}}.csv", "file name template")
 
+	/**
 	var label string
 	flag.StringVar(&label, "label", "", "provide a file name label")
+	**/
 
 	var dp int
 	flag.IntVar(&dp, "dp", 0, "number of decimal places for raw data")
+
+	var gain float64
+	flag.Float64Var(&gain, "gain", 1.0, "apply a gain to the raw data")
 
 	flag.Parse()
 
@@ -113,7 +118,7 @@ func main() {
 
 			sps := float64(msr.Samprate())
 			if !(sps > 0) {
-				log.Printf("skipping block, invalid sample rate: %g", sps)
+				log.Printf("skipping block, invalid sample rate %s: %g", srcname, sps)
 				continue
 			}
 
@@ -121,17 +126,19 @@ func main() {
 
 			samples, err := msr.DataSamples()
 			if err != nil {
-				log.Printf("skipping block, unable to decode samples: %v", err)
+				log.Printf("skipping block, unable to decode samples %s: %v", srcname, err)
 				continue
 			}
 
-			raw := gm.NewRaw(srcname, dp)
+			geomag := raw.NewRaw(srcname, dp)
 			for i, s := range samples {
-				raw.Add(gm.NewReading(st.Add(time.Duration(i)*dt), srcname, float64(s)))
+				geomag.Add(raw.NewReading(st.Add(time.Duration(i)*dt), srcname, gain*float64(s)))
 			}
 
-			log.Println("packet", srcname, st, len(samples))
-			if err := raw.Store(base, path, truncate); err != nil {
+			if verbose {
+				log.Printf("handling packet %s: %s (%d)", srcname, st, len(samples))
+			}
+			if err := geomag.Store(base, path, truncate); err != nil {
 				log.Fatalf("unable to store observations: %v", err)
 			}
 		}
@@ -180,6 +187,9 @@ func main() {
 		handler <- p.GetMSRecord()
 
 		if statefile != "" {
+			if verbose {
+				log.Printf("saving state: %s", statefile)
+			}
 			if t := time.Now(); t.Sub(last) > state {
 				slconn.SaveState(statefile)
 				last = t

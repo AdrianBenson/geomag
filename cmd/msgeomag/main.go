@@ -11,7 +11,7 @@ import (
 
 	"github.com/GeoNet/kit/mseed"
 
-	"github.com/ozym/geomag/internal/gm"
+	"github.com/ozym/geomag/internal/raw"
 )
 
 func main() {
@@ -42,13 +42,16 @@ func main() {
 	var dp int
 	flag.IntVar(&dp, "dp", 0, "number of decimal places for raw data")
 
+	var gain float64
+	flag.Float64Var(&gain, "gain", 1.0, "gain to apply to raw data")
+
 	flag.Parse()
 
 	if err := os.MkdirAll(filepath.Dir(base), 0755); err != nil {
 		log.Fatalf("unable to create base parent directory %s: %v", base, err)
 	}
 
-	raw := make(map[string]*gm.Raw)
+	cache := make(map[string]*raw.Raw)
 
 	msr := mseed.NewMSRecord()
 	defer mseed.FreeMSRecord(msr)
@@ -61,7 +64,7 @@ func main() {
 
 		for n := 0; n < len(data)/512; n++ {
 			if err := msr.Unpack(data[n*512:(n+1)*512], 512, 1, 0); err != nil {
-				log.Printf("skipping block, unable to unpack block %d: %v", n, err)
+				log.Printf("skipping block, unable to unpack block  %s: (%d) %v", f, n, err)
 				continue
 			}
 
@@ -69,7 +72,7 @@ func main() {
 
 			sps := float64(msr.Samprate())
 			if !(sps > 0) {
-				log.Printf("skipping block, invalid sample rate %s: %g", srcname, sps)
+				log.Printf("skipping block, invalid sample rate %s: (%s) %g", f, srcname, sps)
 				continue
 			}
 
@@ -77,25 +80,25 @@ func main() {
 
 			samples, err := msr.DataSamples()
 			if err != nil {
-				log.Printf("skipping block, unable to decode samples %s: %v", srcname, err)
+				log.Printf("skipping block, unable to decode samples %s: (%s) %v", f, srcname, err)
 				continue
 			}
 
 			for n, s := range samples {
 				t := msr.Starttime().Add(time.Duration(n) * dt)
 
-				if _, ok := raw[srcname]; !ok {
-					raw[srcname] = gm.NewRaw(srcname, dp)
+				if _, ok := cache[srcname]; !ok {
+					cache[srcname] = raw.NewRaw(srcname, dp)
 				}
 
-				if r, ok := raw[srcname]; ok {
-					r.Add(gm.NewReading(t, msr.SrcName(0), float64(s)))
+				if r, ok := cache[srcname]; ok {
+					r.Add(raw.NewReading(t, srcname, gain*float64(s)))
 				}
 			}
 		}
 	}
 
-	for _, v := range raw {
+	for _, v := range cache {
 		if err := v.Store(base, path, truncate); err != nil {
 			log.Fatalf("unable to store observations: %v", err)
 		}
