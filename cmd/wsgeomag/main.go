@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/GeoNet/kit/mseed"
+	"github.com/nightlyone/lockfile"
 
 	"github.com/ozym/geomag/internal/raw"
 )
@@ -40,6 +41,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\n")
 		flag.PrintDefaults()
 	}
+
+	var verbose bool
+	flag.BoolVar(&verbose, "verbose", false, "make noise")
+
+	var lock string
+	flag.StringVar(&lock, "lockfile", "", "provide a process lock file")
 
 	var streams string
 	flag.StringVar(&streams, "streams", "", "comma delimited channel srcname(s)")
@@ -85,6 +92,20 @@ func main() {
 
 	flag.Parse()
 
+	if lock != "" {
+		lf, err := lockfile.New(lock)
+		if err != nil {
+			log.Fatalf("unable to open lockfile %s: %v", lock, err)
+		}
+		if err := lf.TryLock(); err != nil {
+			if verbose {
+				log.Printf("unable to lock file %q: %v", lf, err)
+			}
+			os.Exit(1)
+		}
+		defer lf.Unlock()
+	}
+
 	var err error
 	var st, et time.Time
 	if starttime != "" {
@@ -121,6 +142,10 @@ func main() {
 				return t.UTC().Add(-delay), length
 			}
 		}()
+
+		if verbose {
+			log.Printf("query: %s from %v for %v", strings.Join(srcnames, ","), t, dt)
+		}
 
 		data, err := client.Query(srcnames, t, dt)
 		if err != nil {

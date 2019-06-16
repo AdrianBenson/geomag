@@ -27,6 +27,12 @@
 			"path": "github.com/GeoNet/kit/slink",
 			"revision": "1d6c353e4761f0c3ddb422e971f396a2117e4d5f",
 			"revisionTime": "2019-05-23T00:05:41Z"
+		},
+		{
+			"checksumSHA1": "W7TFJ3aRSUenZvYVnzrOZPoIOjs=",
+			"path": "github.com/nightlyone/lockfile",
+			"revision": "0ad87eef1443f64d3d8c50da647e2b1552851124",
+			"revisionTime": "2018-06-18T18:06:23Z"
 		}
 	],
 	"rootPath": "github.com/ozym/geomag"

@@ -10,6 +10,7 @@ import (
 
 	"github.com/GeoNet/kit/mseed"
 	"github.com/GeoNet/kit/slink"
+	"github.com/nightlyone/lockfile"
 
 	"github.com/ozym/geomag/internal/raw"
 )
@@ -33,6 +34,9 @@ func main() {
 
 	var verbose bool
 	flag.BoolVar(&verbose, "verbose", false, "make noise")
+
+	var lock string
+	flag.StringVar(&lock, "lockfile", "", "provide a process lock file")
 
 	// seedlink options
 	var netdly time.Duration
@@ -81,6 +85,20 @@ func main() {
 		flag.Usage()
 		fmt.Fprintf(os.Stderr, "Missing command or seedlink server\n")
 		os.Exit(1)
+	}
+
+	if lock != "" {
+		lf, err := lockfile.New(lock)
+		if err != nil {
+			log.Fatalf("unable to open lockfile %s: %v", lock, err)
+		}
+		if err := lf.TryLock(); err != nil {
+			if verbose {
+				log.Printf("unable to lock file %q: %v", lf, err)
+			}
+			os.Exit(1)
+		}
+		defer lf.Unlock()
 	}
 
 	server := args[len(args)-1]
