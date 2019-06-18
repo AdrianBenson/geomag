@@ -144,7 +144,7 @@ func main() {
 		}()
 
 		if verbose {
-			log.Printf("query: %s from %v for %v", strings.Join(srcnames, ","), t, dt)
+			log.Printf("query: %s from %v to %v", strings.Join(srcnames, ","), t.Add(-dt), t)
 		}
 
 		data, err := client.Query(srcnames, t, dt)
