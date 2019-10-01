@@ -17,10 +17,10 @@
 			"tree": true
 		},
 		{
-			"checksumSHA1": "hsn1FrZs+QyQCtqaQfvHAPJt3JE=",
+			"checksumSHA1": "Ni++SP6yovj4iyfvjN6fg8MwDF0=",
 			"path": "github.com/GeoNet/kit/mseed",
-			"revision": "6135ddd28e96b5304c80fb9dccd1721e9556b56e",
-			"revisionTime": "2018-03-04T10:13:31Z"
+			"revision": "1d6c353e4761f0c3ddb422e971f396a2117e4d5f",
+			"revisionTime": "2019-05-23T00:05:41Z"
 		},
 		{
 			"checksumSHA1": "t38j2UzrrZjF5gqo6pw8aIkukYQ=",
