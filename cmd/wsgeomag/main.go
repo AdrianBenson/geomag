@@ -61,7 +61,7 @@ func main() {
 	flag.StringVar(&endtime, "endtime", "", "optional time to process to, implies empty interval")
 
 	var starttime string
-	flag.StringVar(&endtime, "starttime", "", "optional time to process from, implies empty interval")
+	flag.StringVar(&starttime, "starttime", "", "optional time to process from, implies empty interval")
 
 	var length time.Duration
 	flag.DurationVar(&length, "length", time.Hour, "length of time to process")
