@@ -4,6 +4,8 @@
 *.dll
 *.so
 *.dylib
+*.o
+*.a
 
 # Test binary, build with `go test -c`
 *.test
@@ -14,3 +16,6 @@
 cmd/gsm/gsm
 cmd/benmore/benmore
 cmd/fluxgate/fluxgate
+cmd/msgeomag/msgeomag
+cmd/slgeomag/slgeomag
+cmd/wsgeomag/wsgeomag
