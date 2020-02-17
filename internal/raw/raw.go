@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const rawFormat = "2006-01-02 15:04:05Z"
+const rawFormat = "2006-01-02T15:04:05Z"
 
 type Reading struct {
 	Timestamp time.Time
