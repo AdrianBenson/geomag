@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GeoNet/kit/mseed"
 	"github.com/nightlyone/lockfile"
 
+	"github.com/ozym/geomag/internal/mseed"
 	"github.com/ozym/geomag/internal/raw"
 )
 
