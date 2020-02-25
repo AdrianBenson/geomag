@@ -11,7 +11,8 @@ import (
 
 	"github.com/GeoNet/kit/mseed"
 
-	"github.com/ozym/geomag/internal/raw"
+	"github.com/AdrianBenson/geomag/internal/raw"
+	// "github.com/ozym/geomag/internal/raw"
 )
 
 func main() {

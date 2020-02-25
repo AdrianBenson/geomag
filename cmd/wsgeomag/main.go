@@ -11,7 +11,8 @@ import (
 	"github.com/GeoNet/kit/mseed"
 	"github.com/nightlyone/lockfile"
 
-	"github.com/ozym/geomag/internal/raw"
+	"github.com/AdrianBenson/geomag/internal/raw"
+	// "github.com/ozym/geomag/internal/raw"
 )
 
 const timeFormat = "2006-01-02T15:04:05"
