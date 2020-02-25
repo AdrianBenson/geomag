@@ -8,12 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/GeoNet/kit/mseed"
-	"github.com/GeoNet/kit/slink"
 	"github.com/nightlyone/lockfile"
 
-	"github.com/AdrianBenson/geomag/internal/raw"
-	// "github.com/ozym/geomag/internal/raw"
+	"github.com/ozym/geomag/internal/mseed"
+	"github.com/ozym/geomag/internal/raw"
+	"github.com/ozym/geomag/internal/slink"
 )
 
 const timeFormat = "2006,01,02,15,04,05"

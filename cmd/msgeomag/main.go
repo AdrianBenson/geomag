@@ -9,10 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/GeoNet/kit/mseed"
-
-	"github.com/AdrianBenson/geomag/internal/raw"
-	// "github.com/ozym/geomag/internal/raw"
+	"github.com/ozym/geomag/internal/mseed"
+	"github.com/ozym/geomag/internal/raw"
 )
 
 func main() {
