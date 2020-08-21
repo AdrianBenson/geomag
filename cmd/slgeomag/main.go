@@ -103,12 +103,8 @@ func main() {
 
 	server := args[len(args)-1]
 
-	fi, err := os.Stat(base)
-	switch {
-		case err != nil:
-			log.Fatalf("cannot write to base directory: %v", err)
-		case !fi.IsDir():
-			log.Fatalf("cannot write to base directory: %s: not a directory", base)
+	if err := os.MkdirAll(filepath.Dir(base), 0755); err != nil {
+		log.Fatalf("unable to create base parent directory %s: %v", base, err)
 	}
 
 	handler := make(chan []byte, 20000)
