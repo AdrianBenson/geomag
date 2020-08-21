@@ -19,3 +19,6 @@ cmd/fluxgate/fluxgate
 cmd/msgeomag/msgeomag
 cmd/slgeomag/slgeomag
 cmd/wsgeomag/wsgeomag
+
+# workspace crap
+go-geomag.code-workspace
