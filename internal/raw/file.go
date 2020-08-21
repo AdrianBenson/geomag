@@ -27,7 +27,7 @@ func readFile(path string) ([]byte, error) {
 
 func writeFile(path string, data []byte) error {
 
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0775); err != nil {
 		return err
 	}
 
@@ -59,7 +59,7 @@ func writeFile(path string, data []byte) error {
 		return err
 	}
 
-	if err := os.Chmod(path, 0644); err != nil {
+	if err := os.Chmod(path, 0664); err != nil {
 		return err
 	}
 
