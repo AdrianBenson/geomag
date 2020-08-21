@@ -7,11 +7,8 @@ geomagnetic collection programs
 * __wsgeomag__ FDSN raw csv collector
 
 ```
-cd vendor/github.com/GeoNet/kit/cvendor/libmseed
-make clean
-make
 
-cd vendor/github.com/GeoNet/kit/cvendor/libslink
-make clean
-make
+make -C internal/mseed clean all
+make -C internal/slink clean all
+
 ```
