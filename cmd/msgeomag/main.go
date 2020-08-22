@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/ozym/geomag/internal/mseed"
@@ -46,8 +45,12 @@ func main() {
 
 	flag.Parse()
 
-	if err := os.MkdirAll(filepath.Dir(base), 0755); err != nil {
-		log.Fatalf("unable to create base parent directory %s: %v", base, err)
+	fi, err := os.Stat(base)
+	switch {
+	case err != nil:
+		log.Fatalf("cannot write to base directory: %v", err)
+	case !fi.IsDir():
+		log.Fatalf("cannot write to base directory: %s: not a directory", base)
 	}
 
 	cache := make(map[string]*raw.Raw)
