@@ -105,10 +105,10 @@ func main() {
 
 	fi, err := os.Stat(base)
 	switch {
-		case err != nil:
-			log.Fatalf("cannot write to base directory: %v", err)
-		case !fi.IsDir():
-			log.Fatalf("cannot write to base directory: %s: not a directory", base)
+	case err != nil:
+		log.Fatalf("cannot write to base directory: %v", err)
+	case !fi.IsDir():
+		log.Fatalf("cannot write to base directory: %s: not a directory", base)
 	}
 
 	handler := make(chan []byte, 20000)
