@@ -59,14 +59,18 @@ func writeFile(path string, data []byte) error {
 		return err
 	}
 
-	fmode := 0644
-	fi, _ := os.Stat(filepath.Dir(path))
-	if fi != nil && fi.Mode()&os.ModeSetgid != 0 {
-		fmode = 0664
-	}
-	if err := os.Chmod(path, os.FileMode(fmode)); err != nil {
+	fmode := getFileMode(path)
+	if err := os.Chmod(path, fmode); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func getFileMode(path string) os.FileMode {
+	fi, _ := os.Stat(filepath.Dir(path))
+	if fi != nil && fi.Mode()&os.ModeSetgid != 0 {
+		return os.FileMode(0664)
+	}
+	return os.FileMode(0644)
 }
