@@ -83,7 +83,24 @@ func getFileMode(filename string) os.FileMode {
 	return fmode
 }
 
-		return os.FileMode(0664)
+// Step back through tree until find dir that exists, test setgid is set
+// and set dir creation mode accordingly.
+func getDirMode(path string) os.FileMode {
+	dirmode := os.FileMode(0755)
+	for {
+		fi, err := os.Stat(path)
+		if os.IsExist(err) {
+			if isModeSetgid(fi) {
+				dirmode = os.FileMode(0775)
+			}
+			break
+		}
+		if path == "." || path == string(os.PathSeparator) {
+			break
+		} else {
+			path = filepath.Dir(path)
+		}
 	}
-	return os.FileMode(0644)
+
+	return dirmode
 }
