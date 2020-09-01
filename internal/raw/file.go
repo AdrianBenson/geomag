@@ -67,9 +67,22 @@ func writeFile(path string, data []byte) error {
 	return nil
 }
 
-func getFileMode(path string) os.FileMode {
-	fi, _ := os.Stat(filepath.Dir(path))
-	if fi != nil && fi.Mode()&os.ModeSetgid != 0 {
+// True if setgid sticky bit is set
+func isModeSetgid(fi os.FileInfo) bool {
+	return fi != nil && fi.IsDir() && fi.Mode()&os.ModeSetgid != 0
+}
+
+// True if is dir and setgid has been set
+func getFileMode(filename string) os.FileMode {
+	fi, _ := os.Stat(filepath.Dir(filename))
+	fmode := os.FileMode(0644)
+	if isModeSetgid(fi) {
+		fmode = os.FileMode(0664)
+	}
+
+	return fmode
+}
+
 		return os.FileMode(0664)
 	}
 	return os.FileMode(0644)
