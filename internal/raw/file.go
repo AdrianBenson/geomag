@@ -26,8 +26,8 @@ func readFile(path string) ([]byte, error) {
 }
 
 func writeFile(path string, data []byte) error {
-
-	if err := os.MkdirAll(filepath.Dir(path), 0775); err != nil {
+	dirmode := getDirMode(filepath.Dir(path))
+	if err := os.MkdirAll(filepath.Dir(path), dirmode); err != nil {
 		return err
 	}
 
