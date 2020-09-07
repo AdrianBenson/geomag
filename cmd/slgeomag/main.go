@@ -184,10 +184,12 @@ func main() {
 
 	var last time.Time
 	for {
+		// dying here
 		p, rc := slconn.Collect()
 		if rc != slink.SLPACKET {
 			break
 		}
+		log.Printf("slconn.Collect() rc: %d", rc)
 		if p.PacketType() != slink.SLDATA {
 			continue
 		}
