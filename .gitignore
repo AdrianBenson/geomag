@@ -23,3 +23,4 @@ cmd/wsgeomag/wsgeomag
 # workspace crap
 go-geomag.code-workspace
 .vscode
+*__debug_bin
