@@ -1,8 +1,9 @@
+#!/usr/bin/env bash
 
 basedir="$(pwd)/${1:-xxx}"
-echo $basedir
 mkdir -p "$basedir"
-./cmd/slgeomag/slgeomag -base=xxx \
+chmod g+s "$basedir"
+./cmd/slgeomag/slgeomag -base="$basedir" \
                          -streams=NZ_APIM,NZ_SBAM,NZ_EYWM,NZ_SMHS \
                          -selectors=5?L?? \
                          -statefile="$basedir"/slgeomag.state \
