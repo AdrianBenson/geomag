@@ -167,7 +167,7 @@ func main() {
 
 	switch {
 	case statefile != "":
-		if err := os.MkdirAll(filepath.Dir(statefile), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(statefile), 0775); err != nil {
 			log.Fatalf("unable to create statefile parent directory %s: %v", statefile, err)
 		}
 		switch _, err := os.Stat(statefile); err {
