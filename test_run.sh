@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-basedir="$(pwd)/${1:-xxx}"
+basedir="$(pwd)/${1:-test_run_files}"
 mkdir -p "$basedir"
 chmod g+s "$basedir"
 ./cmd/slgeomag/slgeomag -base="$basedir" \

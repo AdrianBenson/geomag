@@ -24,3 +24,4 @@ cmd/wsgeomag/wsgeomag
 go-geomag.code-workspace
 .vscode
 *__debug_bin
+test_run_files/
