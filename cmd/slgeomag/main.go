@@ -152,7 +152,8 @@ func main() {
 		}
 	}()
 
-	slconn := slink.NewSLCD()
+	var slconn *slink.SLCD
+	slconn = slink.NewSLCD()
 	defer slink.FreeSLCD(slconn)
 
 	// seedlink settings
@@ -184,12 +185,14 @@ func main() {
 
 	var last time.Time
 	for {
-		// dying here
 		p, rc := slconn.Collect()
-		if rc != slink.SLPACKET {
+		if rc == slink.SLTERMINATE {
+			log.Printf("SLTERMINATE signal received.")
+			break
+		} else if rc != slink.SLPACKET {
+			log.Printf("Collect return value not SLPACKET or SLTERMINATE: %d", rc)
 			break
 		}
-		log.Printf("slconn.Collect() rc: %d", rc)
 		if p.PacketType() != slink.SLDATA {
 			continue
 		}

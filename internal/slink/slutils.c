@@ -67,9 +67,13 @@ sl_collect (SLCD *slconn, SLpacket **slpack)
     slconn->stat->keepalive_trig = -1; /* Init keepalive trigger to reset state */
   }
 
+  int loop_counter = 0;  /* counter to directly trigger the error */
+
   /* Start the primary loop  */
   while (1)
   {
+    loop_counter++;
+
     if (!slconn->terminate)
     {
       if (slconn->link == -1)
@@ -306,7 +310,14 @@ sl_collect (SLCD *slconn, SLpacket **slpack)
       select_tv.tv_sec  = 0;
       select_tv.tv_usec = 500000; /* Block up to 0.5 seconds */
 
+      /* !!!!!!!!!!  This is where the fun starts */
       select_ret = select ((slconn->link + 1), &select_fd, NULL, NULL, &select_tv);
+
+      /* Simulate the interrupted system call after n loops */
+      if (loop_counter >= 5) {
+        select_ret = -1;
+        errno = EINTR;
+      }
 
       /* Check the return from select(), an interrupted system call error
 	     will be reported if a signal handler was used.  If the terminate
@@ -328,6 +339,17 @@ sl_collect (SLCD *slconn, SLpacket **slpack)
         sl_log_r (slconn, 2, 0, "select() error: %s\n", slp_strerror ());
         slconn->link              = sl_disconnect (slconn);
         slconn->stat->netdly_trig = -1;
+
+        /* !!! End up here if EINTR occurs
+        The above flags set above leave the slconn in state where loop
+        cannot end and connection cannot be restarted
+        ->  infinite loop
+
+        Force kill slconn to end.
+        */
+        if (errno == EINTR) {
+            sl_terminate(slconn);
+        }
       }
 
       if (bytesread < 0) /* read() failed */
