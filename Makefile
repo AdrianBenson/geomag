@@ -2,6 +2,9 @@
 GO_PROGS = wsgeomag slgeomag msgeomag
 
 C_LIBS = mseed slink
+CFLAGS=-g
+export CFLAGS
+
 
 all: $(GO_PROGS)
 
