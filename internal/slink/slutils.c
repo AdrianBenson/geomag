@@ -314,10 +314,10 @@ sl_collect (SLCD *slconn, SLpacket **slpack)
       select_ret = select ((slconn->link + 1), &select_fd, NULL, NULL, &select_tv);
 
       /* Simulate the interrupted system call after n loops */
-      if (loop_counter >= 5) {
-        select_ret = -1;
-        errno = EINTR;
-      }
+      // if (loop_counter >= 5) {
+      //   select_ret = -1;
+      //   errno = EINTR;
+      // }
 
       /* Check the return from select(), an interrupted system call error
 	     will be reported if a signal handler was used.  If the terminate
