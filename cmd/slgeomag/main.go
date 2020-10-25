@@ -186,7 +186,11 @@ func main() {
 	for {
 		// dying here
 		p, rc := slconn.Collect()
-		if rc != slink.SLPACKET {
+		if rc == slink.SLTERMINATE {
+			log.Printf("SLTERMINATE signal received.")
+			break
+		} else if rc != slink.SLPACKET {
+			log.Printf("Collect return value not SLPACKET or SLTERMINATE: %d", rc)
 			break
 		}
 		log.Printf("slconn.Collect() rc: %d", rc)
