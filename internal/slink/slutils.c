@@ -38,6 +38,7 @@ int
 sl_collect (SLCD *slconn, SLpacket **slpack)
 {
   int bytesread;
+  int eintr_counter = 0;
   double current_time;
   char retpacket;
 
@@ -321,6 +322,20 @@ sl_collect (SLCD *slconn, SLpacket **slpack)
         {
           bytesread = sl_recvdata (slconn, (void *)&slconn->stat->databuf[slconn->stat->recptr],
                                    BUFSIZE - slconn->stat->recptr, slconn->sladdr);
+        }
+        eintr_counter = 0;
+      }
+      else if (select_ret == EINTR)
+      {
+        eintr_counter++;
+        if (eintr_counter >= 10)
+        {
+          sl_log_r (slconn, 2, 0, "select() error: %d consecutive EINTR, terminating", eintr_counter);
+          sl_terminate(slconn);
+        }
+        else
+        {
+          sl_log_r (slconn, 2, 0, "select() error: EINTR encountered, continuing");
         }
       }
       else if (select_ret < 0 && !slconn->terminate)
