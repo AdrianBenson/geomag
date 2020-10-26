@@ -325,6 +325,10 @@ sl_collect (SLCD *slconn, SLpacket **slpack)
         }
         eintr_counter = 0;
       }
+      /* Catch EINTR raised when running under golang >= 1.14
+       - continue and try again, its not probably not a real error
+       - terminate if many consecutive EINTR errors, it probably is a real error
+      */
       else if (select_ret == EINTR)
       {
         eintr_counter++;
@@ -343,6 +347,8 @@ sl_collect (SLCD *slconn, SLpacket **slpack)
         sl_log_r (slconn, 2, 0, "select() error: %s\n", slp_strerror ());
         slconn->link              = sl_disconnect (slconn);
         slconn->stat->netdly_trig = -1;
+        /* if we got here bad things will happen, so terminate instead */
+        sl_terminate(slconn);
       }
 
       if (bytesread < 0) /* read() failed */
