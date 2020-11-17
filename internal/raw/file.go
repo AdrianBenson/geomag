@@ -27,7 +27,8 @@ func readFile(path string) ([]byte, error) {
 
 func writeFile(path string, data []byte) error {
 
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	dirmode := getDirMode(filepath.Dir(path))
+	if err := os.MkdirAll(filepath.Dir(path), dirmode); err != nil {
 		return err
 	}
 
@@ -59,9 +60,48 @@ func writeFile(path string, data []byte) error {
 		return err
 	}
 
-	if err := os.Chmod(path, 0644); err != nil {
+	fmode := getFileMode(path)
+	if err := os.Chmod(path, fmode); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// True if setgid sticky bit is set
+func isModeSetgid(fi os.FileInfo) bool {
+	return fi != nil && fi.IsDir() && fi.Mode()&os.ModeSetgid != 0
+}
+
+// True if is dir and setgid has been set
+func getFileMode(filename string) os.FileMode {
+	fi, _ := os.Stat(filepath.Dir(filename))
+	fmode := os.FileMode(0644)
+	if isModeSetgid(fi) {
+		fmode = os.FileMode(0664)
+	}
+
+	return fmode
+}
+
+// Step back through tree until find dir that exists, test setgid is set
+// and set dir creation mode accordingly.
+func getDirMode(path string) os.FileMode {
+	dirmode := os.FileMode(0755)
+	for {
+		fi, err := os.Stat(path)
+		if os.IsExist(err) {
+			if isModeSetgid(fi) {
+				dirmode = os.FileMode(0775)
+			}
+			break
+		}
+		if path == "." || path == string(os.PathSeparator) {
+			break
+		} else {
+			path = filepath.Dir(path)
+		}
+	}
+
+	return dirmode
 }

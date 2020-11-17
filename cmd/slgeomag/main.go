@@ -103,8 +103,12 @@ func main() {
 
 	server := args[len(args)-1]
 
-	if err := os.MkdirAll(filepath.Dir(base), 0755); err != nil {
-		log.Fatalf("unable to create base parent directory %s: %v", base, err)
+	fi, err := os.Stat(base)
+	switch {
+	case err != nil:
+		log.Fatalf("cannot write to base directory: %v", err)
+	case !fi.IsDir():
+		log.Fatalf("cannot write to base directory: %s: not a directory", base)
 	}
 
 	handler := make(chan []byte, 20000)
@@ -163,7 +167,7 @@ func main() {
 
 	switch {
 	case statefile != "":
-		if err := os.MkdirAll(filepath.Dir(statefile), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(statefile), 0775); err != nil {
 			log.Fatalf("unable to create statefile parent directory %s: %v", statefile, err)
 		}
 		switch _, err := os.Stat(statefile); err {
@@ -180,8 +184,13 @@ func main() {
 
 	var last time.Time
 	for {
+		// dying here
 		p, rc := slconn.Collect()
-		if rc != slink.SLPACKET {
+		if rc == slink.SLTERMINATE {
+			log.Printf("SLTERMINATE signal received.")
+			break
+		} else if rc != slink.SLPACKET {
+			log.Printf("Collect return value not SLPACKET or SLTERMINATE: %d", rc)
 			break
 		}
 		if p.PacketType() != slink.SLDATA {
